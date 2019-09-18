@@ -1861,10 +1861,6 @@ plots.autoMargin = function(gd, id, o) {
             };
             pushMarginIds[id] = 1;
         }
-
-        if(!fullLayout._replotting) {
-            return plots.doAutoMargin(gd);
-        }
     }
 };
 
@@ -1875,7 +1871,6 @@ plots.doAutoMargin = function(gd) {
 
     var gs = fullLayout._size;
     var margin = fullLayout.margin;
-    var oldMargins = Lib.extendFlat({}, gs);
 
     // adjust margins for outside components
     // fullLayout.margin is the requested margin,
@@ -1952,16 +1947,6 @@ plots.doAutoMargin = function(gd) {
     gs.p = Math.round(margin.pad);
     gs.w = Math.round(width) - gs.l - gs.r;
     gs.h = Math.round(height) - gs.t - gs.b;
-
-    // if things changed and we're not already redrawing, trigger a redraw
-    if(!fullLayout._replotting && plots.didMarginChange(oldMargins, gs)) {
-        if('_redrawFromAutoMarginCount' in fullLayout) {
-            fullLayout._redrawFromAutoMarginCount++;
-        } else {
-            fullLayout._redrawFromAutoMarginCount = 1;
-        }
-        return Registry.call('plot', gd);
-    }
 };
 
 var marginKeys = ['l', 'r', 't', 'b', 'p', 'w', 'h'];

@@ -142,10 +142,6 @@ function plot(gd, data, layout, config) {
         return plotLegacyPolar(gd, data, layout);
     }
 
-    // so we don't try to re-call Plotly.plot from inside
-    // legend and colorbar, if margins changed
-    fullLayout._replotting = true;
-
     // make or remake the framework if we need to
     if(graphWasEmpty) makePlotFramework(gd);
 
@@ -197,6 +193,8 @@ function plot(gd, data, layout, config) {
         return exports.addFrames(gd, frames);
     }
 
+    // TODO move to subroutines/
+    //
     // draw framework first so that margin-pushing
     // components can position themselves correctly
     var drawFrameworkCalls = 0;
@@ -301,12 +299,9 @@ function plot(gd, data, layout, config) {
 
     // in case the margins changed, draw margin pushers again
     function marginPushersAgain() {
-        if(!Plots.didMarginChange(oldMargins, fullLayout._size)) return;
-
-        return Lib.syncOrAsync([
-            marginPushers,
-            subroutines.layoutStyles
-        ], gd);
+        if(Plots.didMarginChange(oldMargins, fullLayout._size)) {
+            return marginPushers();
+        }
     }
 
     function positionAndAutorange() {
@@ -355,10 +350,13 @@ function plot(gd, data, layout, config) {
         marginPushersAgain
     );
 
-    if(hasCartesian) seq.push(positionAndAutorange);
-
-    seq.push(subroutines.layoutStyles);
-    if(hasCartesian) seq.push(drawAxes);
+    if(hasCartesian) {
+        seq.push(
+            positionAndAutorange,
+            subroutines.layoutStyles,
+            drawAxes
+        );
+    }
 
     seq.push(
         subroutines.drawData,
@@ -368,11 +366,6 @@ function plot(gd, data, layout, config) {
         Plots.addLinks,
         Plots.rehover,
         Plots.redrag,
-        // TODO: doAutoMargin is only needed here for axis automargin, which
-        // happens outside of marginPushers where all the other automargins are
-        // calculated. Would be much better to separate margin calculations from
-        // component drawing - see https://github.com/plotly/plotly.js/issues/2704
-        Plots.doAutoMargin,
         Plots.previousPromises
     );
 
@@ -388,13 +381,7 @@ function plot(gd, data, layout, config) {
 }
 
 function emitAfterPlot(gd) {
-    var fullLayout = gd._fullLayout;
-
-    if(fullLayout._redrawFromAutoMarginCount) {
-        fullLayout._redrawFromAutoMarginCount--;
-    } else {
-        gd.emit('plotly_afterplot');
-    }
+    gd.emit('plotly_afterplot');
 }
 
 function setPlotConfig(obj) {
@@ -1874,13 +1861,21 @@ function relayout(gd, astr, val) {
     } else if(Object.keys(aobj).length) {
         axRangeSupplyDefaultsByPass(gd, flags, specs) || Plots.supplyDefaults(gd);
 
+        // TODO will need additional margin-push logic
         if(flags.legend) seq.push(subroutines.doLegend);
         if(flags.layoutstyle) seq.push(subroutines.layoutStyles);
+        // TODO will need additional margin-push logic
         if(flags.axrange) addAxRangeSequence(seq, specs.rangesAltered);
+        // TODO will need additional margin-push logic
         if(flags.ticks) seq.push(subroutines.doTicksRelayout);
         if(flags.modebar) seq.push(subroutines.doModeBar);
         if(flags.camera) seq.push(subroutines.doCamera);
+        // TODO will need additional margin-push logic
         if(flags.colorbars) seq.push(subroutines.doColorBars);
+
+        // TODO
+        // maybe add something like
+        // seq.push(subroutines.drawMarginPushersIfNeeded)
 
         seq.push(emitAfterPlot);
     }
